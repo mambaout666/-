@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "绝区零本周点赞采集器",
+  "version": "1.2.1",
+  "description": "绝区零本周新作榜采集器，支持浏览器登录会话和独立 HTML 展示页导出。",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "打开绝区零采集器"
+  }
+}
