@@ -2,9 +2,9 @@
 
 ## 仓库信息
 
-- 名称：`gamebanana-zzz-crawler`
-- 简介：绝区零本周新作榜采集器，支持浏览器登录会话和独立 HTML 展示页导出。
-- 可选标签：`gamebanana`、`zenless-zone-zero`、`python`、`edge-extension`、`mod`。
+- 可选名称：`gamebanana-mod-journal`，也可以继续使用现有仓库名称。
+- 简介：绝区零、原神、鸣潮、星穹铁道本周新作榜采集器，支持登录会话和独立 HTML 展示页。
+- 可选标签：`gamebanana`、`zenless-zone-zero`、`genshin-impact`、`wuthering-waves`、`honkai-star-rail`、`python`、`edge-extension`、`mod`。
 
 GitHub 仓库的 About 简介需在创建或编辑仓库时填写，修改本地 README 不会自动更新该字段。
 

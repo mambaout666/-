@@ -5,6 +5,7 @@ from pathlib import Path
 from crawler import Client, save_json
 from media import normalize_details
 from showcase import render
+from games import get_game
 
 
 def main():
@@ -21,7 +22,8 @@ def main():
         for row in report['results']:
             try:
                 detail=client.get(f"Mod/{int(row['id'])}/ProfilePage",records=False)
-                if detail.get('_idRow')!=row['id'] or detail.get('_aGame',{}).get('_idRow')!=19567: raise ValueError('详情 ID 或游戏不匹配')
+                game = get_game(report.get('game', {}).get('id', 19567))
+                if detail.get('_idRow')!=row['id'] or detail.get('_aGame',{}).get('_idRow')!=game['id']: raise ValueError('详情 ID 或游戏不匹配')
                 row.update(normalize_details(detail));row.pop('media_error',None)
             except Exception as exc:
                 row['media_error']=str(exc)

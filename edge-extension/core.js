@@ -1,4 +1,20 @@
 (function (root) {
+  const games = typeof module !== 'undefined' && module.exports ? require('./games.js') : root.ModGames;
+  function game(value = 19567) {
+    const result = games.find(item => item.id === value || item.key === value);
+    if (!result) throw new Error('不支持的游戏');
+    return result;
+  }
+  function stateGame(state) { return game(state.game_id ?? 19567); }
+  function checkpointKey(value) { return `mod-journal-checkpoint-v2-${game(value).id}`; }
+  function restoreCheckpoint(storage, value) {
+    const selected = game(value);
+    const raw = storage.getItem(checkpointKey(selected.id)) || (selected.id === 19567 ? storage.getItem('zzz-weekly-collector-checkpoint-v1') : null);
+    const state = JSON.parse(raw || 'null');
+    if (!state || state.version !== 1 || !Array.isArray(state.mods) || !state.counts || !state.errors) throw new Error('这款游戏没有可继续的有效断点');
+    if (stateGame(state).id !== selected.id) throw new Error('断点所属游戏不匹配');
+    return {...state, game_id:selected.id};
+  }
   const HOUR = 3600000;
   function weekWindow(now = Date.now()) {
     const local = new Date(now + 8 * HOUR);
@@ -51,12 +67,12 @@
     const seen = new Set(state.newWeekSeen || []);
     while (!state.indexDone && !stopped()) {
       const page = state.nextPage || 1;
-      const {rows, total, done} = parsePage(await get('Mod/Index', {_nPage: page, _nPerpage: 50, '_aFilters[Generic_Game]': 19567, _sSort: 'Generic_Newest'}), page);
+      const {rows, total, done} = parsePage(await get('Mod/Index', {_nPage: page, _nPerpage: 50, '_aFilters[Generic_Game]': stateGame(state).id, _sSort: 'Generic_Newest'}), page);
       let previous = state.previousPublished ?? Infinity, crossed = false, fresh = 0;
       const pending = [], pageSeen = new Set(seen);
       for (const row of rows) {
         const stamp = row._tsDateAdded, id = row._idRow;
-        if (row._aGame?._idRow !== 19567 || !Number.isInteger(id) || !Number.isInteger(stamp)) throw new Error('缺少发布时间或游戏信息，已停止新作统计');
+        if (row._aGame?._idRow !== stateGame(state).id || !Number.isInteger(id) || !Number.isInteger(stamp)) throw new Error('缺少发布时间或游戏信息，已停止新作统计');
         if (pageSeen.has(id)) continue;
         if (stamp > previous) throw new Error('列表不是按发布时间倒序，已停止，避免漏掉新作');
         previous = stamp; pageSeen.add(id); fresh++;
@@ -86,7 +102,7 @@
     const ranked = state.mods.filter(mod => Object.hasOwn(state.counts, mod.id)).map(mod => ({...mod, ...state.counts[mod.id], ...(state.details?.[mod.id] || {})}));
     ranked.sort((a, b) => b.weekly_likes - a.weekly_likes || a.id - b.id);
     const complete = state.indexDone && !state.limited && !state.indexChanged && (newWeek || state.mods.length === state.siteTotal) && ranked.length === state.mods.length && !Object.keys(state.errors).length;
-    return {status: complete ? 'complete' : 'partial', scope: 'GameBanana content visible to the current browser session; not guaranteed to include every site submission',
+    return {status: complete ? 'complete' : 'partial', game:stateGame(state), scope: 'GameBanana content visible to the current browser session; not guaranteed to include every site submission',
       selection: {mode: newWeek ? 'new_week' : state.maxMods > 0 ? 'latest_sample' : 'all_visible', limit: state.maxMods || 0, index_order: 'newest', ranking_metric: newWeek ? 'new_mod_total_likes_at_collection' : 'weekly_likes'},
       metric: newWeek ? 'cumulative likes observed during collection for mods published in the selected window; excludes older mods' : 'surviving likes created in the selected time window', window_start_inclusive: iso(state.start), window_end_exclusive: iso(state.end),
       generated_at: iso(Math.floor(Date.now() / 1000)), index_pages_read: (state.nextPage || 1) - 1,
@@ -102,7 +118,7 @@
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
   }
-  const api = {weekWindow, iso, parsePage, countLikes, totalLikes, indexNewWeek, report, csvCell, escapeHtml};
+  const api = {game, stateGame, checkpointKey, restoreCheckpoint, weekWindow, iso, parsePage, countLikes, totalLikes, indexNewWeek, report, csvCell, escapeHtml};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ZZZCollectorCore = api;
 })(globalThis);

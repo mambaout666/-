@@ -10,7 +10,7 @@
   const heart = '<svg viewBox="0 0 24 24"><path d="M20.6 4.6a5.3 5.3 0 0 0-7.5 0L12 5.7l-1.1-1.1a5.3 5.3 0 0 0-7.5 7.5L12 21l8.6-8.9a5.3 5.3 0 0 0 0-7.5Z"/></svg>';
   function normalize(input) {
     if (!input || !Array.isArray(input.results)) throw new Error('请选择采集器导出的 JSON 结果');
-    return {...input, status: input.status === 'complete' ? 'complete' : 'partial', results: input.results.map((r,i) => ({...r,
+    return {...input, game:input.game || {id:19567,name:'绝区零',english:'ZENLESS ZONE ZERO',title:'新艾利都 · 模组放映室',eyebrow:'NEW ERIDU / MOD JOURNAL',subtitle:'新的风格，新的街头故事。',accent:'#c9e8d4'}, status: input.status === 'complete' ? 'complete' : 'partial', results: input.results.map((r,i) => ({...r,
       id: Number(r.id) || i + 1, rank: Number(r.rank) || i + 1, name:String(r.name || '未命名模组'),
       url:safe(r.url), author:String(r.author || 'GameBanana creator'), category:String(r.category || 'MOD'),
       images:Array.isArray(r.images) ? r.images.map(x => ({url:safe(x.url), caption:String(x.caption || r.name)})).filter(x => x.url) : [],
@@ -54,6 +54,7 @@
   }
   function render() {
     const fast = report.selection?.mode === 'new_week';
+    $('game-label').textContent = String(report.game.english || report.game.name || 'MOD JOURNAL');
     applyConfig(); const item = cover();
     $('hero-media').innerHTML = item ? `<img src="${esc(item.images[0].url)}" alt="${esc(item.name)}" fetchpriority="high">` : '<div class="missing-media"><strong>N / E</strong></div>';
     bindImages($('hero-media')); $('cover-open').textContent = item ? item.name + ' ↗' : 'YOUR NEXT DISCOVERY'; $('cover-open').disabled = !item;
@@ -119,7 +120,7 @@
   $('settings-back').onclick=()=>{$('settings').hidden=true;document.querySelectorAll('.nav-item').forEach(b=>b.hidden=false)};
   $('settings-apply').onclick=()=>{config={...config,title:$('title-input').value.trim()||'模组放映室',subtitle:$('subtitle-input').value,eyebrow:$('eyebrow-input').value,motion:$('motion-input').checked,show_rated_images:$('rated-input').checked};render();notify('本期设置已应用，保存当前页面即可保留');setMenu(false)};
   $('import-open').onclick=$('import-bottom').onclick=()=>$('import-file').click();
-  $('import-file').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024)throw new Error('请选择小于 20 MB 的结果文件');const input=JSON.parse(await file.text());report=normalize(input);render();setMenu(false);notify('本期数据已更新，标题与模板保持不变')}catch(err){notify(err.message)}finally{e.target.value=''}};
+  $('import-file').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024)throw new Error('请选择小于 20 MB 的结果文件');const input=normalize(JSON.parse(await file.text()));for(const key of ['title','eyebrow','subtitle','accent']){if(config[key]===report.game[key] && input.game[key])config[key]=input.game[key]}if(input.game.id!==report.game.id)config.hero_id=null;report=input;render();setMenu(false);notify('本期数据已更新，自定义标题与模板保留')}catch(err){notify(err.message)}finally{e.target.value=''}};
   $('save-page').onclick=()=>{setMenu(false);const clone=document.documentElement.cloneNode(true);clone.querySelector('#report-data').textContent=JSON.stringify(report).replaceAll('<','\\u003c');clone.querySelector('#site-config').textContent=JSON.stringify(config).replaceAll('<','\\u003c');clone.querySelector('body').classList.remove('menu-open');clone.querySelector('body').style.overflow='';clone.querySelector('#page').removeAttribute('inert');clone.querySelector('#drawer').setAttribute('inert','');clone.querySelector('#scrim').hidden=true;clone.querySelector('#detail-dialog').removeAttribute('open');clone.querySelector('#detail-content').replaceChildren();const blob=new Blob(['<!doctype html>\n'+clone.outerHTML],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mod-journal-'+String(report.window_end_exclusive||'edition').slice(0,10)+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)};
   render();
 })();

@@ -1,0 +1,6 @@
+[
+  {"id":19567,"key":"zzz","name":"绝区零","short_name":"绝区零","english":"ZENLESS ZONE ZERO","mark":"Z","city":"新艾利都","title":"新艾利都 · 模组放映室","eyebrow":"NEW ERIDU / MOD JOURNAL","subtitle":"新的风格，新的街头故事。","accent":"#c9e8d4","color":"#39745b","tint":"#edf5ef"},
+  {"id":8552,"key":"genshin","name":"原神","short_name":"原神","english":"GENSHIN IMPACT","mark":"G","city":"提瓦特","title":"提瓦特 · 模组放映室","eyebrow":"TEYVAT / MOD JOURNAL","subtitle":"让每一次冒险，都有新的模样。","accent":"#d8e6f5","color":"#496f9d","tint":"#eef3fa"},
+  {"id":20357,"key":"wuwa","name":"鸣潮","short_name":"鸣潮","english":"WUTHERING WAVES","mark":"W","city":"索拉里斯","title":"索拉里斯 · 模组放映室","eyebrow":"SOLARIS / MOD JOURNAL","subtitle":"循着回响，发现另一种可能。","accent":"#eee2c7","color":"#8a6a35","tint":"#f8f3e8"},
+  {"id":18366,"key":"hsr","name":"崩坏：星穹铁道","short_name":"星穹铁道","english":"HONKAI STAR RAIL","mark":"H","city":"星穹列车","title":"星穹列车 · 模组放映室","eyebrow":"ASTRAL EXPRESS / MOD JOURNAL","subtitle":"下一站，让灵感先行。","accent":"#e3dcf3","color":"#79609e","tint":"#f3eff9"}
+]

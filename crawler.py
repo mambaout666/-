@@ -1,4 +1,4 @@
-"""GameBanana ZZZ weekly likes: Python 3.11+, standard library only."""
+"""GameBanana multi-game weekly likes: Python 3.11+, standard library only."""
 from __future__ import annotations
 
 import argparse
@@ -18,6 +18,7 @@ from urllib.parse import urlencode
 from urllib.request import build_opener, ProxyHandler, Request
 from media import enrich_state
 from showcase import render as render_showcase
+from games import GAMES, get_game, state_game
 
 ROOT = Path(__file__).resolve().parent
 API = "https://gamebanana.com/apiv12/"
@@ -73,7 +74,7 @@ class Client:
             if wait:
                 time.sleep(wait)
             request = Request(url, headers={
-                "User-Agent": "ZZZModLinkCollector/1.0 (personal read-only research)",
+                "User-Agent": "ModJournalCollector/2.0 (personal read-only research)",
                 "Accept": "application/json",
             })
             retry_after = 0
@@ -122,14 +123,14 @@ def fetch_index(client, state, checkpoint, max_mods=0):
     while not state.get("index_done"):
         rows, total, complete = records_page(
             client, "Mod/Index", page,
-            **{"_aFilters[Generic_Game]": GAME_ID, "_sSort": "Generic_Newest"},
+            **{"_aFilters[Generic_Game]": state_game(state)["id"], "_sSort": "Generic_Newest"},
         )
         if state.get("site_total") is not None and state["site_total"] != total:
             state["index_changed"] = True
         state["site_total"] = total
         added = 0
         for row in rows:
-            if row.get("_aGame", {}).get("_idRow") != GAME_ID:
+            if row.get("_aGame", {}).get("_idRow") != state_game(state)["id"]:
                 raise CrawlError("Game filter was not respected; refusing mixed-game results")
             mod_id = row.get("_idRow")
             if not isinstance(mod_id, int):
@@ -181,14 +182,14 @@ def fetch_new_week(client, state, checkpoint):
     while not state.get("index_done"):
         page = state.get("next_index_page", 1)
         rows, total, done = records_page(client, "Mod/Index", page,
-            **{"_aFilters[Generic_Game]": GAME_ID, "_sSort": "Generic_Newest"})
+            **{"_aFilters[Generic_Game]": state_game(state)["id"], "_sSort": "Generic_Newest"})
         previous = state.get("previous_published")
         crossed, fresh, pending = False, 0, []
         page_seen = set(seen)
         # Validate a complete page before changing the checkpoint.
         for row in rows:
             stamp, mod_id, likes = row.get("_tsDateAdded"), row.get("_idRow"), row.get("_nLikeCount")
-            if row.get("_aGame", {}).get("_idRow") != GAME_ID or type(mod_id) is not int or type(stamp) is not int:
+            if row.get("_aGame", {}).get("_idRow") != state_game(state)["id"] or type(mod_id) is not int or type(stamp) is not int:
                 raise CrawlError("Missing publication timestamp or game identity")
             if mod_id in page_seen:
                 continue
@@ -272,8 +273,9 @@ def make_report(state, top):
                 and len(results) == len(state["mods"]) and not state["errors"])
     return {
         "status": "complete" if complete else "partial",
+        "game": state_game(state),
         "selection": {"mode": "new_week" if new_week else "latest_sample" if state.get("max_mods", 0) > 0 else "all_visible", "limit": state.get("max_mods", 0), "index_order": "newest", "ranking_metric": "new_mod_total_likes_at_collection" if new_week else "weekly_likes"},
-        "scope": "public unauthenticated ZZZ mods returned by GameBanana API",
+        "scope": f"public unauthenticated {state_game(state)['english']} mods returned by GameBanana API",
         "metric": "cumulative likes observed during collection for mods published in the selected window; excludes older mods" if new_week else "currently visible likes whose creation timestamps fall in the window",
         "window_start_inclusive": iso(state["start"]),
         "window_end_exclusive": iso(state["end"]),
@@ -309,7 +311,7 @@ def export_report(state, output, top):
     title = "本周点赞排行" if report["status"] == "complete" else "部分采集结果（不是全站前十）"
     if new_week:
         title = "本周新作点赞排行（不含老 Mod）" if report["status"] == "complete" else "本周新作部分结果（尚未完整）"
-    lines = [title + "", f"统计区间：{report['window_start_inclusive']} 至 {report['window_end_exclusive']}（不含结束时刻）",
+    lines = [report["game"]["name"] + " · " + title, f"统计区间：{report['window_start_inclusive']} 至 {report['window_end_exclusive']}（不含结束时刻）",
              f"已检查 {report['checked']} / {report['site_total']} 个公开 Mod", ""]
     if new_week:
         lines[2] = f"发现本周新作 {report['checked']} 个；以上为发布时间区间，按列表采集时的累计点赞排序"
@@ -321,8 +323,9 @@ def export_report(state, output, top):
 
 
 def run(args):
-    data_dir = ROOT / "data"
-    data_dir.mkdir(exist_ok=True)
+    game = get_game(args.game)
+    data_dir = ROOT / "data" if game["id"] == GAME_ID else ROOT / "data" / game["key"]
+    data_dir.mkdir(parents=True, exist_ok=True)
     checkpoint = data_dir / "checkpoint.json"
     if args.resume:
         if not checkpoint.exists():
@@ -330,13 +333,16 @@ def run(args):
         state = json.loads(checkpoint.read_text(encoding="utf-8"))
         if state.get("version") != 1:
             raise CrawlError("Checkpoint version is unsupported")
+        if state_game(state)["id"] != game["id"]:
+            raise CrawlError("Checkpoint belongs to a different game")
         if args.max_mods and args.max_mods != state["max_mods"]:
             raise CrawlError("Resume preserves the original --max-mods setting")
         LOG.info("Resuming fixed window %s to %s", iso(state["start"]), iso(state["end"]))
     else:
         start, end = week_window(datetime.now(CHINA))
-        run_id = datetime.now(CHINA).strftime("%Y%m%d_%H%M%S_%f")
+        run_id = game["key"] + "_" + datetime.now(CHINA).strftime("%Y%m%d_%H%M%S_%f")
         state = {"version": 1, "start": start, "end": end, "run_id": run_id,
+                 "game_id": game["id"],
                  "mods": [], "counts": {}, "errors": {}, "index_done": False,
                  "max_mods": args.max_mods, "limited": False,
                  "scope": "new_week" if args.scope == "new-week" and not args.max_mods else "all_visible"}
@@ -378,7 +384,8 @@ def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GameBanana 绝区零本周新作点赞榜（默认不含老 Mod）")
+    parser = argparse.ArgumentParser(description="GameBanana 多游戏本周新作点赞榜（默认不含老 Mod）")
+    parser.add_argument("--game", choices=[game["key"] for game in GAMES], default="zzz", help="zzz=绝区零，genshin=原神，wuwa=鸣潮，hsr=星穹铁道")
     parser.add_argument("--resume", action="store_true", help="继续上次采集，保持原统计区间")
     parser.add_argument("--scope", choices=["new-week", "all"], default="new-week", help="默认仅本周新发布作品；all 包含老 Mod，逐条查点赞历史，较慢")
     parser.add_argument("--max-mods", type=int, default=0, help="仅用于试跑；0=全部，非零结果明确标为部分结果")
@@ -395,8 +402,9 @@ def main():
     (ROOT / "logs").mkdir(exist_ok=True)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=[
         logging.StreamHandler(), logging.FileHandler(ROOT / "logs" / "crawler.log", encoding="utf-8")])
-    lock_path = ROOT / "data" / "running.lock"
-    lock_path.parent.mkdir(exist_ok=True)
+    lock_dir = ROOT / "data" if args.game == "zzz" else ROOT / "data" / args.game
+    lock_path = lock_dir / "running.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:

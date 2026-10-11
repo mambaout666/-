@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "绝区零本周点赞采集器",
-  "version": "1.2.1",
-  "description": "绝区零本周新作榜采集器，支持浏览器登录会话和独立 HTML 展示页导出。",
+  "name": "模组周刊 · 多游戏新作榜",
+  "version": "2.0.0",
+  "description": "采集绝区零、原神、鸣潮、星穹铁道的本周新作点赞前十，支持登录会话和独立 HTML 展示页。",
   "permissions": [
     "activeTab",
     "scripting"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "打开绝区零采集器"
+    "default_title": "打开模组周刊"
   }
 }

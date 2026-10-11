@@ -3,6 +3,7 @@ from html import unescape
 from html.parser import HTMLParser
 import re
 from urllib.parse import urlparse, parse_qs
+from games import state_game
 
 
 def https_url(value):
@@ -86,7 +87,7 @@ def enrich_state(client, state, top=10):
         if key in details and details[key].get("media_schema") == 2 and not details[key].get("media_error"): continue
         try:
             item = client.get(f"Mod/{key}/ProfilePage", records=False)
-            if item.get("_idRow") != mod["id"] or item.get("_aGame", {}).get("_idRow") != 19567:
+            if item.get("_idRow") != mod["id"] or item.get("_aGame", {}).get("_idRow") != state_game(state)["id"]:
                 raise ValueError("Detail ID/game mismatch")
             details[key] = normalize_details(item)
         except Exception as error:

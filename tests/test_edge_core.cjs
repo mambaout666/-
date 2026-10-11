@@ -6,6 +6,52 @@ const page = (rows, total, perpage = 50, done = false) => ({_aRecords: rows, _aM
 const mod = (id, stamp, likes = 1) => ({_idRow:id, _aGame:{_idRow:19567}, _tsDateAdded:stamp, _tsDateModified:199, _nLikeCount:likes});
 const newState = () => ({scope:'new_week',start:100,end:200,mods:[],counts:{},errors:{},nextPage:1});
 
+test('shared game registry matches Python source and rejects unsupported games', () => {
+  const games = require('../edge-extension/games.js');
+  const source = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '../games.json'), 'utf8'));
+  assert.deepEqual(games, source);
+  for (const game of games) assert.equal(core.game(game.key).id, game.id);
+  assert.throws(() => core.game(999999));
+});
+test('all four games use their own API filter and report identity', async () => {
+  for (const game of require('../edge-extension/games.js')) {
+    const state = {...newState(), game_id:game.id};
+    await core.indexNewWeek(async (endpoint, query) => {
+      assert.equal(query['_aFilters[Generic_Game]'], game.id);
+      return page([{...mod(1,150,7),_aGame:{_idRow:game.id}}],1);
+    },state);
+    assert.equal(core.report(state).game.id,game.id);
+    assert.equal(core.report(state).status,'complete');
+    const bad = {...newState(),game_id:game.id};
+    await assert.rejects(core.indexNewWeek(async()=>page([{...mod(1,150),_aGame:{_idRow:999}}],1),bad));
+    assert.equal(bad.mods.length,0);
+  }
+});
+test('per-game resume is isolated; only ZZZ migrates legacy checkpoints', () => {
+  const values = new Map();
+  const storage = {getItem:key=>values.get(key) || null};
+  values.set('zzz-weekly-collector-checkpoint-v1',JSON.stringify({version:1,...newState()}));
+  assert.equal(core.restoreCheckpoint(storage,19567).game_id,19567);
+  assert.throws(()=>core.restoreCheckpoint(storage,8552),/没有/);
+  for (const game of require('../edge-extension/games.js')) {
+    values.set(core.checkpointKey(game.id),JSON.stringify({version:1,...newState(),game_id:game.id}));
+    assert.equal(core.restoreCheckpoint(storage,game.id).game_id,game.id);
+  }
+  values.set(core.checkpointKey(8552),JSON.stringify({version:1,...newState(),game_id:19567}));
+  assert.throws(()=>core.restoreCheckpoint(storage,8552),/不匹配/);
+});
+test('generated HTML uses selected-game defaults and still accepts custom titles', () => {
+  require('../edge-extension/showcase.js');
+  for (const game of require('../edge-extension/games.js')) {
+    const report = {game,results:[]};
+    const html = globalThis.ZZZShowcase.render(report);
+    const config = JSON.parse(html.match(/id="site-config">([\s\S]*?)<\/script>/)[1]);
+    assert.equal(config.title,game.title);
+    const custom = globalThis.ZZZShowcase.render(report,{title:'My edition'});
+    assert.equal(JSON.parse(custom.match(/id="site-config">([\s\S]*?)<\/script>/)[1]).title,'My edition');
+  }
+});
+
 test('new-week scans only recent pages, includes Monday, excludes updated old mods, makes no Likes requests', async () => {
   const state=newState(), calls=[];
   const pages=[page([mod(1,200),mod(2,199,4)],5650,2),page([mod(2,199,4),mod(3,100,7)],5650,2),page([mod(4,99,900)],5650,2)];
